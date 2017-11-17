@@ -20,7 +20,7 @@
 5，TreeMap继承了NavigableMap，NavigableMap是SortedMap的扩展接口，提供了查询相关的方法列表以供子类实现，比如 lowerEntry floorEntry。其中pollFirstEntry，pollLastEntry获取并删除元素，有点队列的作用。  
 6，TreeMap和HashMap一样它也实现了两个私有方法writeObject和readObject，用于自定义序列化，以及也是线程不安全的，可以使用SortedMap m = Collections.synchronizedSortedMap(new TreeMap(...))。关于synchronizedMap,我们查看Collections其实很简单就是使用装饰模式把包装进来的map全部方法在调用时都先用synchronized (mutex)这种方式来进行同步化。  
 7，TreeMap的实现的操作比如：containsKey get put remove 算法时间复杂度是log(n)，算法可以参考《算法导论》。看来有必要好好学习下了。  
-8，为了维持tree的平衡，在TreeMap.put方法部分操作，一个把新加或删除的节点找到然后操作，第二个是在新加或删除的节点基础上将树进行平衡操作。
+8，为了维持tree的平衡，在TreeMap.put方法部分操作，一个把新加或删除的节点找到然后操作，第二个是在新加或删除的节点基础上将树进行平衡操作。  
 9，所以TreeMap是通过key.compareTo()或Comparator来定位key的，HashMap是用hashcode,两套不同的实现的map结构。
 
 #### WeakHashMap  
