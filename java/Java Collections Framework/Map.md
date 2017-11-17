@@ -1,4 +1,4 @@
-#### HashMap LinkedHashMap
+### HashMap LinkedHashMap
 1，可以用null做为key和value  
 2，capacity和load factor影响性能  
 3，线程不安全，外部用同步对象控制，还可以用synchronizedMap  
@@ -12,7 +12,7 @@
 10，优化部分中的树，查找自己位置时折半查找效率高于链表，而删除操作效率低于链表。树中当两个节点的hash一样，会利用compareTo方法比较，如果还是相同，就使用identityHashCode（http://blog.csdn.net/tbdp6411/article/details/46915981）进行比较。  
 11,LinkedHashMap作为它的子类用模版方法的方式实现了排序的功能，可以看见LinkedHashMap源码中Entry定义了before，after来定义自己元素的前后。存储结构完全使用hashmap一套，只是用另外一个线路链接起全部元素。  
 
-#### SortedMap NavigableMap TreeMap：  
+### SortedMap NavigableMap TreeMap：  
 1,继承结构：SortedMap <—NavigableMap <— TreeMap 从TreeMap看，它实现了Map,SortedMap,NavigableMap  
 2,对于顺序来说，必然是有比较，一个基础的知识Comparable是一个接口，继承后实现int compareTo(T o)方法，再比较时直接调用这个object的这个方法为依据来确认。Comparators是给集合对象外部强加的比较方法，它可以被传给一些排序方法，比如：Collections.sort，Arrays.sort。Comparators还用于某些对象的排序，比如：SortedSet SortedMap，或者提供给一些没有实现Comparable接口的集合拥有排序的能力。  
 3，TreeMap故名思义就是用树结构实现的，进源代码第一句话，TreeMap是红黑树的实现方式。树这个结构以及各种演变的结构都是前人为了解决问题发明的（https://www.cnblogs.com/maybe2030/p/4732377.htm）  
@@ -23,5 +23,5 @@
 8，为了维持tree的平衡，在TreeMap.put方法部分操作，一个把新加或删除的节点找到然后操作，第二个是在新加或删除的节点基础上将树进行平衡操作。  
 9，所以TreeMap是通过key.compareTo()或Comparator来定位key的，HashMap是用hashcode,两套不同的实现的map结构。
 
-#### WeakHashMap  
+### WeakHashMap  
 tomcat源码中使用WeakHashMap：（https://github.com/apache/tomcat/blob/trunk/java/org/apache/tomcat/util/collections/ConcurrentCache.java）
