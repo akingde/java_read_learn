@@ -5,7 +5,7 @@
 4，当key的hashcode都相同时，如果支持Comparable，则进行排序降低影响  
 5，迭代时并发更改了map，则会抛出ConcurrentModificationException  
 6，当元素拥挤时，会将列表转变成树，优化性能，缩减时会恢复为链表  
-7，hash(key)核心hash算法，在长度为2的幂前提下，hash值高位下移16位，参与取模，降低碰撞，另外取模部分利用2的幂减1来做&操作提高了性能。  
+7，hash(key)核心hash算法，在长度为2的幂前提下，hash值高位下移16位，参与取模，降低碰撞，另外取模部分利用2的幂减1来做&操作提高了性能。这里是取模的优化方案，在HashMap中约定长度必然是2的幂，然后在取模时才有&操作以提高性能。  
 8，链表状态下碰撞元素加入时是放入链表尾部，联想到redis放入元素是放入头部，因为它认为最近放入的元素可能最容易被使用。  
 9，继承Serializable接口，可是字段使用transient修饰，比如table,entrySet。原因是hashcode操作依赖jvm所处的环境因素,不同环境可能有不同的hash值，做一现成存储的内容既是序列化也无法通用.所以hashmap自己实现了writeObject和readObject，这里就需要知道java在序列化和反序列化一个类时是先调用writeObject和readObject,如果没有默认调用的是ObjectOutputStream的defaultWriteObject以及ObjectInputStream的defaultReadObject方法。
 （http://www.cnblogs.com/zhilu-doc/p/5338462.html）  
@@ -21,15 +21,19 @@
 6，TreeMap和HashMap一样它也实现了两个私有方法writeObject和readObject，用于自定义序列化，以及也是线程不安全的，可以使用SortedMap m = Collections.synchronizedSortedMap(new TreeMap(...))。关于synchronizedMap,我们查看Collections其实很简单就是使用装饰模式把包装进来的map全部方法在调用时都先用synchronized (mutex)这种方式来进行同步化。  
 7，TreeMap的实现的操作比如：containsKey get put remove 算法时间复杂度是log(n)，算法可以参考《算法导论》。看来有必要好好学习下了。  
 8，为了维持tree的平衡，在TreeMap.put方法部分操作，一个把新加或删除的节点找到然后操作，第二个是在新加或删除的节点基础上将树进行平衡操作。  
-9，所以TreeMap是通过key.compareTo()或Comparator来定位key的，HashMap是用hashcode,两套不同的实现的map结构。
+9，所以TreeMap是通过key.compareTo()或Comparator来定位key的坑位置，HashMap是用hashcode,两套不同的实现的map结构。但是它们都是用equals来决定key的唯一性的。
 
 ### WeakHashMap  
 1,WeakHashMap使用WeakReference作为Entry，是交weak的原因，内部结构实现和HashMap差异不大，不过没有HashMap的转变成树这么复杂，就是简单链表就实现了。
 关键还是WeakReference，java中的引用类型有：强引用，软引用，弱引用，虚引用。这个设计是java对内存回收的部分能力提供给开发者了。
 2.一直疑惑WeakHashMap的使用场景，找到一个很好的例子，tomcat源码中使用WeakHashMap：（https://github.com/apache/tomcat/blob/trunk/java/org/apache/tomcat/util/collections/ConcurrentCache.java）
 
+### IdentityHashMap
+1，在TreeMap还是HashMap，都是用equals来确定key的唯一性，而IdentityHashMap的特殊指出是它用==。
+
 
 ### ConCurrentHashMap
+1，无论synchronizedMap，还是HashTable，在操作map的时候都是锁住整个map的，达到了线程安全的效果，效果不佳，不过我觉得在小概率少量并发的场景里，简单使用是可行的。ConCurrentHashMap从结构上进行了设计，将一个map分段成多个Segment，这些Segment作为整个map的一部分在并发操作时进行锁操作，这样就不用锁整个map了，说白了就是把原来要锁整个map优化成锁map的一小段。
 
 
 ### ConcurrentReaderHashMap
@@ -37,7 +41,3 @@
 
 
 ### ConcurrentSkipListMap
-
-
-### IdentityHashMap
-1，== 和 equals
