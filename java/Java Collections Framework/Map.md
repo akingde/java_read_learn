@@ -29,7 +29,7 @@
 2.一直疑惑WeakHashMap的使用场景，找到一个很好的例子，tomcat源码中使用WeakHashMap：（https://github.com/apache/tomcat/blob/trunk/java/org/apache/tomcat/util/collections/ConcurrentCache.java）
 
 ### IdentityHashMap
-1，在TreeMap还是HashMap，都是用equals来确定key的唯一性，而IdentityHashMap的特殊指出是它用==。
+1，无论是TreeMap还是HashMap，都是用equals来确定key的唯一性，而IdentityHashMap的特殊指出是它用==。
 
 
 ### ConCurrentHashMap
