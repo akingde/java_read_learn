@@ -41,3 +41,15 @@
 
 
 ### ConcurrentSkipListMap
+
+
+
+### trick about Map
+在使用map的过程中遇到的一些技巧：  
+1.在插入元素是放入一个自定义的object，来表示不存在的情况：
+
+    if (null == method) {
+            methods.put(key, NULL_OBJECT);
+        } else {
+            methods.put(key, method);
+        }
