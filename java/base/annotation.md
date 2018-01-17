@@ -112,16 +112,16 @@ method.isAnnotationPresent(AnnotationName.class);
 
 RetentionPolicy.CLASS
 在.java .class文件时存在，加载到内存后就不存在了
-jdk提供里一个apt机制（https://docs.oracle.com/javase/6/docs/technotes/guides/apt/GettingStarted.html#AnnotationProcessor）
+jdk提供里一个apt机制（https://docs.oracle.com/javase/6/docs/technotes/guides/apt/GettingStarted.html#AnnotationProcessor）  
 
 
 RetentionPolicy.SOURCE
 在.java时存在 .class文件时就不存在了
-所以这个是给java编译器使用的  
+所以这个是给java编译器使用的   
 
 
-@Inherited用于注解之间的继承关系描述。
-@Documented注解表明制作javadoc时，是否将注解信息加入文档。如果注解在声明时使用了@Documented，则在制作javadoc时注解信息会加入javadoc。
+@Inherited用于注解之间的继承关系描述。  
+@Documented注解表明制作javadoc时，是否将注解信息加入文档。如果注解在声明时使用了@Documented，则在制作javadoc时注解信息会加入javadoc。  
 
 总结一下：  
 注解作为数据的描述者，可以在java代码从源码到运行的各个阶段被解析出内容，然后依据内容做想做的事。
