@@ -7,7 +7,7 @@
 6，当元素拥挤时，会将列表转变成树，优化性能，缩减时会恢复为链表  
 7，hash(key)核心hash算法，在长度为2的幂前提下，hash值高位下移16位，参与取模，降低碰撞，另外取模部分利用2的幂减1来做&操作提高了性能。这里是取模的优化方案，在HashMap中约定长度必然是2的幂，然后在取模时才有&操作以提高性能。  
 8，链表状态下碰撞元素加入时是放入链表尾部，联想到redis放入元素是放入头部，因为它认为最近放入的元素可能最容易被使用。  
-9，继承Serializable接口，可是字段使用transient修饰，比如table,entrySet。原因是hashcode操作依赖jvm所处的环境因素,不同环境可能有不同的hash值，做一现成存储的内容既是序列化也无法通用.所以hashmap自己实现了writeObject和readObject，这里就需要知道java在序列化和反序列化一个类时是先调用writeObject和readObject,如果没有默认调用的是ObjectOutputStream的defaultWriteObject以及ObjectInputStream的defaultReadObject方法。
+9，继承Serializable接口，可是字段使用transient修饰，比如table,entrySet。原因是hashcode操作依赖jvm所处的环境因素,不同环境可能有不同的hash值，作为存储的内容在序列化时无法通用.另外，我们知道table中始终会有一些位置违背良心元素填充，如果直接序列化，那么这个空值的空间其实是无用的浪费。我们在[ArrayList的实现]中也可以得到印证。所以hashmap自己实现了writeObject和readObject，这里就需要知道java在序列化和反序列化一个类时是先调用writeObject和readObject,如果没有默认调用的是ObjectOutputStream的defaultWriteObject以及ObjectInputStream的defaultReadObject方法。
 （http://www.cnblogs.com/zhilu-doc/p/5338462.html）  
 10，优化部分中的树，查找自己位置时折半查找效率高于链表，而删除操作效率低于链表。树中当两个节点的hash一样，会利用compareTo方法比较，如果还是相同，就使用identityHashCode（http://blog.csdn.net/tbdp6411/article/details/46915981）进行比较。  
 11,LinkedHashMap作为它的子类用模版方法的方式实现了排序的功能，可以看见LinkedHashMap源码中Entry定义了before，after来定义自己元素的前后。存储结构完全使用hashmap一套，只是用另外一个线路链接起全部元素。  
