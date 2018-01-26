@@ -16,3 +16,54 @@ private void grow(int minCapacity) {
   }
 ```
 会增加oldCapacity >> 1（原容量除2整数部分）个容量出来，如果还是没达到这次加入数据后能放下的数据，那就扩容到能放下这下数据的最小容量。
+4，ArrayList是线程不安全的。
+
+
+### LinkedList
+1，是一个标准的双向链表，双向就是一个元素可以链接到自己前面的元素也可以链接到后面的元素，如此遍历时是可以从头向尾，也可以从尾向头。
+直接看元素的定义：
+```JAVA
+private static class Node<E> {
+      E item;
+      Node<E> next;
+      Node<E> prev;
+
+      Node(Node<E> prev, E element, Node<E> next) {
+          this.item = element;
+          this.next = next;
+          this.prev = prev;
+      }
+  }
+  ```
+
+  2，LinkedList实现了List和Deque（双端队列）接口。
+  3，因为是队列形式实现的列表，所以当要访问（get）某个下标（index）的元素时，是需要进行循环遍历操作的，应该有个比较清晰的认识：  
+  ```JAVA
+  public E get(int index) {
+       checkElementIndex(index);
+       return node(index).item;
+   }
+   /**
+  * Returns the (non-null) Node at the specified element index.
+  */
+ Node<E> node(int index) {
+     // assert isElementIndex(index);
+
+     if (index < (size >> 1)) {
+         Node<E> x = first;
+         // 遍历
+         for (int i = 0; i < index; i++)
+             x = x.next;
+         return x;
+     } else {
+         Node<E> x = last;
+         for (int i = size - 1; i > index; i--)
+             x = x.prev;
+         return x;
+     }
+ }
+ ```
+
+  ### ArrayDeque
+  1，就是用数组实现一个Deque（双端队列），实现了Deque要求的方法。
+  
