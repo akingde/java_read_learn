@@ -1,6 +1,6 @@
 ###### Contents：
 1.[annotation](https://github.com/dchack/java_read_learn/blob/master/java/base/annotation.md)   
-2.[synchronized](https://github.com/dchack/java_read_learn/blob/master/java/base/synchronized.md)
+2.[synchronized](https://github.com/dchack/java_read_learn/blob/master/java/base/synchronized.md)  
 3.[final](https://github.com/dchack/java_read_learn/blob/master/java/base/final.md)
 
 jcf:  
