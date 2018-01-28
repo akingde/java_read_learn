@@ -64,7 +64,7 @@ private static class Node<E> {
  }
  ```
 
-  ### ArrayDeque
+### ArrayDeque
   1，就是用数组实现一个Deque（双端队列），实现了Deque要求的方法。
 
 ```java
