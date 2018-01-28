@@ -65,14 +65,12 @@ private static class Node<E> {
  ```
 
 ### ArrayDeque
-  1，就是用数组实现一个Deque（双端队列），实现了Deque要求的方法。
+1，就是用数组实现一个Deque（双端队列），实现了Deque要求的方法。和linkedList一样作为链表，这就简单了下标加减就天然连接在一起了。
 
-```java
-  transient Object[] elements;
-```
-实现中，规定这个数组的长度保持2的幂次，当调用add相关的方法时，在数组放满触发扩容操作。
+2，实现中，规定这个数组的长度保持2的幂次，当调用add相关的方法时，在数组放满触发扩容操作。
 因为是数组实现，头尾必然需要一个下标进行记录：
 ```java
+  transient Object[] elements;
 /**
   * The index of the element at the head of the deque (which is the
   * element that would be removed by remove() or pop()); or an
@@ -145,3 +143,7 @@ public E pollFirst() {
     return result;
 }
 ```
+3，java.util.Queue 和 java.util.Deque
+
+* java.util.Queue 定义了FIFO的单向队列
+* java.util.Deque 继承Queue, 定义了双向队列 可以FIFO 和 LIFO
