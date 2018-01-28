@@ -1,6 +1,6 @@
 ### ArrayList
 1，简单来讲ArrayList就是个可以伸缩容量的数组结构体。内部维护了一个Object[] elementData  
-2，数组的伸缩，必然会使用到数组的复制操作，所以多处调用了System.arraycopy方法。还有Arrays.copyOf(elementData, size)方法实际也是调用了底层的 System.arraycopy方法。
+2，数组的伸缩，必然会使用到数组的复制操作，所以多处调用了System.arraycopy方法。还有Arrays.copyOf(elementData, size)方法实际也是调用了底层的 System.arraycopy方法。  
 3，add方法新增元素，就是向数组最后一位放。那么容量不够了扩容的规则是这样的：
 ```JAVA
 private void grow(int minCapacity) {
@@ -16,8 +16,25 @@ private void grow(int minCapacity) {
   }
 ```
 会增加oldCapacity >> 1（原容量除2整数部分）个容量出来，如果还是没达到这次加入数据后能放下的数据，那就扩容到能放下这下数据的最小容量。
-4，ArrayList是线程不安全的。
-
+4，ArrayList是线程不安全的。  
+5，因为是数组实现当要找一个特定的元素时，就需要遍历比对来完成了：
+```JAVA
+public boolean contains(Object o) {
+    return indexOf(o) >= 0;
+}
+public int indexOf(Object o) {
+     if (o == null) {
+         for (int i = 0; i < size; i++)
+             if (elementData[i]==null)
+                 return i;
+     } else {
+         for (int i = 0; i < size; i++)
+             if (o.equals(elementData[i]))
+                 return i;
+     }
+     return -1;
+ }
+ ```
 
 ### LinkedList
 1，是一个标准的双向链表，双向就是一个元素可以链接到自己前面的元素也可以链接到后面的元素，如此遍历时是可以从头向尾，也可以从尾向头。
