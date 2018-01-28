@@ -143,7 +143,6 @@ public E pollFirst() {
     return result;
 }
 ```
-3，java.util.Queue 和 java.util.Deque
-
+3，java.util.Queue 和 java.util.Deque  
 * java.util.Queue 定义了FIFO的单向队列
 * java.util.Deque 继承Queue, 定义了双向队列 可以FIFO 和 LIFO
