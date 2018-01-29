@@ -23,3 +23,6 @@ HashSet(int initialCapacity, float loadFactor, boolean dummy) {
   ```
 dummy字段是无用的字段只是为了重载出一个定制的构造函数，用LinkedHashMap代替HashMap。  
 和HashSet原理一样用map的key实现了set。
+
+### TreeSet
+1，举一反三，TreeSet肯定是用[TreeMap](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/Map.md#sortedmap-navigablemap-treemap)实现的了。
