@@ -15,14 +15,18 @@ java世界里，类继承Serializable接口，就标记了该类可以被序列�
 public class WriteReadTest {
 
     public static void main(String[] args){
-
         Person person = new Person();
         person.setAge(25);
         person.setName("YXY");
-        Person.TYPE="no"; //modify the static value
+        person.setType("not"); //modify the static value
+        Person sPerson = writerThenRead(person);
+        System.out.println(sPerson.getAge());//25
+        System.out.println(sPerson.getType());//yes
+    }
 
+    public static Person writerThenRead(Person person) {
         //serialize
-        File file = new File("/test.txt");
+        File file = new File("/Users/dongchao/dc_file/test.txt");
         try {
             OutputStream out = new FileOutputStream(file);
             ObjectOutputStream objout = new ObjectOutputStream(out);
@@ -31,20 +35,48 @@ public class WriteReadTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        //deserialize
+        person.setType("yes"); //modify the static value
+        //deserializ
         Person perobj = null;
         try {
             InputStream in = new FileInputStream(file);
             ObjectInputStream objin = new ObjectInputStream(in);
             perobj = (Person)objin.readObject();
-            System.out.println(perobj.TYPE);
             in.close();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
+        return perobj;
     }
+
 }
 ```
+type是static修饰的，首先赋值no，然后进行了序列化，而此时这个信息是不存入我们序列化的文件的，因为在反序列化前又把它改成了yes，最后打印出来的就是yes。其实这个静态变量是存在栈中的数据，不参与序列化，引用也是直接引用栈的数据，所以改成什么就引用到什么。
+#### Transient 关键字
+变量被transient修饰，变量将不再是对象序列化的一部分，该变量内容在序列化后无法获得访问。
+测试代码：
+```JAVA
+public static void main(String[] args) {
+        Person person = new Person();
+        person.setCardNo("3306111111");
+        Person sPerson = WriteReadTest.writerThenRead(person);
+        System.out.println(sPerson.getCardNo());//null
+    }
+```
+字段cardNo在这里尽管设置了，但在序列化反序列化后是无法传输的。
+
+
+
+#### 其他序列化库
+* Kryo
+* FST
+* Hessian
+* Json
+* Xml
+* Protostuff
+* ProtoBuf
+* Thrift
+* Avro
+* MsgPack
