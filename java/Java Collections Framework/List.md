@@ -35,7 +35,28 @@ public int indexOf(Object o) {
      return -1;
  }
  ```
+ 6，序列化实现自己实现了writeObject和readObject方法，思路是只需要将放了元素的值全部记录下来即可，因为毕竟哪些没放满的空间就没必要序列化占空间记录了。
+ ```JAVA
+ private void writeObject(java.io.ObjectOutputStream s)
+      throws java.io.IOException{
+      // Write out element count, and any hidden stuff
+      int expectedModCount = modCount;
+      s.defaultWriteObject();
 
+      // Write out size as capacity for behavioural compatibility with clone()
+      s.writeInt(size);
+
+      // Write out all elements in the proper order.
+      for (int i=0; i<size; i++) {
+          s.writeObject(elementData[i]);
+      }
+
+      if (modCount != expectedModCount) {
+          throw new ConcurrentModificationException();
+      }
+  }
+```
+从实现代码上看，在序列化过程中如果list发生修改，则序列化失败。先把数组的有效长度size放进ObjectOutputStream，然后在循环size长度将数据一个个放入即可。
 ### LinkedList
 1，是一个标准的双向链表，双向就是一个元素可以链接到自己前面的元素也可以链接到后面的元素，如此遍历时是可以从头向尾，也可以从尾向头。
 直接看元素的定义：
@@ -163,3 +184,19 @@ public E pollFirst() {
 3，java.util.Queue 和 java.util.Deque  
 * java.util.Queue 定义了FIFO的单向队列
 * java.util.Deque 继承Queue, 定义了双向队列 可以FIFO 和 LIFO
+
+4，和ArrayList一样也实现了writeObject和readObject方法
+```java
+private void writeObject(java.io.ObjectOutputStream s)
+          throws java.io.IOException {
+      s.defaultWriteObject();
+
+      // Write out size
+      s.writeInt(size());
+
+      // Write out elements in order.
+      int mask = elements.length - 1;
+      for (int i = head; i != tail; i = (i + 1) & mask)
+          s.writeObject(elements[i]);
+  }
+  ```

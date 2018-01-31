@@ -3,7 +3,7 @@
 ### Serializable
 java世界里，类继承Serializable接口，就标记了该类可以被序列化和反序列化。  
 序列化的过程也很清晰：   
-* 在序列化过程中，如果被序列化的类中定义了writeObject 和 readObject 方法，虚拟机会试图调用对象类里的 writeObject 和 readObject 方法，进行用户自定义的序列化和反序列化。用户自定义的 writeObject 和 readObject 方法可以允许用户控制序列化的过程，比如可以在序列化的过程中动态改变序列化的数值。
+* 在序列化过程中，如果被序列化的类中定义了writeObject 和 readObject 方法，虚拟机会试图调用对象类里的 writeObject 和 readObject 方法，进行用户自定义的序列化和反序列化。用户自定义的 writeObject 和 readObject 方法可以允许用户控制序列化的过程，比如可以在序列化的过程中动态改变序列化的数值。在[HashMap](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/Map.md#hashmap-linkedhashmap)，[ArrayList](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/List.md#arraylist)中都有自定义的序列化规则实现，以确保更好的利用空间提高性能。
 
 * 如果没有这样的方法，则默认调用是 ObjectOutputStream 的 defaultWriteObject 方法以及 ObjectInputStream 的 defaultReadObject 方法。
 
@@ -67,7 +67,18 @@ public static void main(String[] args) {
 ```
 字段cardNo在这里尽管设置了，但在序列化反序列化后是无法传输的。
 
+#### Externalizable 接口
+代码：
+```JAVA
+public interface Externalizable extends java.io.Serializable {
 
+    void writeExternal(ObjectOutput out) throws IOException;
+
+    void readExternal(ObjectInput in) throws IOException, ClassNotFoundException;
+}
+```
+继承Externalizable可以明确要增加一些自定义的序列化规则，实现writeExternal和readExternal方法，操作ObjectOutput和ObjectInput。  
+不过不常用，因为我们实现writeObject 和 readObject 方法也是可以达到效果的。
 
 #### 其他序列化库
 * Kryo
