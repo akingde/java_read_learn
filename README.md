@@ -6,10 +6,7 @@
 3.[final](https://github.com/dchack/java_read_learn/blob/master/java/base/final.md)  
 4.[Serializable](https://github.com/dchack/java_read_learn/blob/master/java/base/Serializable.md)  
 
-###### Java Collections Framework:  
-1.[Map](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/Map.md)  
-2.[List](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/List.md)  
-3.[Set](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/Set.md)  
+###### [Java Collections Framework](https://github.com/dchack/java_read_learn/blob/master/java/Java%20Collections%20Framework/contents.md)
 
 It's all about my reading books and learning things.   
 life is short,life also is long,take care and have fun.
