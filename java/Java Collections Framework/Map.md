@@ -23,6 +23,33 @@
 8，为了维持tree的平衡，在TreeMap.put方法部分操作，一个把新加或删除的节点找到然后操作，第二个是在新加或删除的节点基础上将树进行平衡操作。  
 9，所以TreeMap是通过key.compareTo()或Comparator来定位key的坑位置，HashMap是用hashcode,两套不同的实现的map结构。但是它们都是用equals来决定key的唯一性的。
 
+### HashTable
+1，HashTable实现和HashMap相似，操作的方法用synchronized修饰：
+```JAVA
+public synchronized V put(K key, V value) {
+        // Make sure the value is not null
+        if (value == null) {
+            throw new NullPointerException();
+        }
+
+        // Makes sure the key is not already in the hashtable.
+        Entry<?,?> tab[] = table;
+        int hash = key.hashCode();
+        int index = (hash & 0x7FFFFFFF) % tab.length;
+        @SuppressWarnings("unchecked")
+        Entry<K,V> entry = (Entry<K,V>)tab[index];
+        for(; entry != null ; entry = entry.next) {
+            if ((entry.hash == hash) && entry.key.equals(key)) {
+                V old = entry.value;
+                entry.value = value;
+                return old;
+            }
+        }
+
+        addEntry(hash, key, value, index);
+        return null;
+    }
+```
 ### WeakHashMap  
 1,WeakHashMap使用WeakReference作为Entry，是交weak的原因，内部结构实现和HashMap差异不大，不过没有HashMap的转变成树这么复杂，就是简单链表就实现了。
 关键还是WeakReference，java中的引用类型有：强引用，软引用，弱引用，虚引用。这个设计是java对内存回收的部分能力提供给开发者了。
