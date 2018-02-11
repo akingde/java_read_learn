@@ -223,6 +223,7 @@ generatedClasses 是一个LoadingCache类，这个LoadingCache是用于存储的
 // 实际存储map
 protected final ConcurrentMap<KK, Object> map;
 protected final Function<K, V> loader;
+// 名字是map 其实是封装了获得kk的算法 获取是调用apply方法
 protected final Function<K, KK> keyMapper;
 ```
 Function类是一个函数接口（Functional Interface）：
@@ -231,31 +232,93 @@ public interface Function<K, V> {
     V apply(K key);
 }
 ```
+可以理解为带某个自定义算法的类，可以传送给其他类使用。  
+LoadingCache类中的核心方法get(K key)（其中key后续进行详细分析），最终会调用到createEntry，：
+```JAVA
+public V get(K key) {
+    // 包装key的算法
+    final KK cacheKey = keyMapper.apply(key);
+    Object v = map.get(cacheKey);
+    // 如果是FutureTask 则说明还在创建中，如果不是FutureTask，则说明已经创建好可直接返回
+    if (v != null && !(v instanceof FutureTask)) {
+        return (V) v;
+    }
+    return createEntry(key, cacheKey, v);
+}
+protected V createEntry(final K key, KK cacheKey, Object v) {
+     FutureTask<V> task;
+     // 标记是一个新建的流程
+     boolean creator = false;
+     // v有值说明是已经找到在执行的FutureTask
+     if (v != null) {
+         // Another thread is already loading an instance
+         task = (FutureTask<V>) v;
+     } else {
+         //新建一个FutureTask
+         task = new FutureTask<V>(new Callable<V>() {
+             public V call() throws Exception {
+                 // task执行内容
+                 return loader.apply(key);
+             }
+         });
+         // putIfAbsent判断是否已经有值
+         Object prevTask = map.putIfAbsent(cacheKey, task);
+         // 三种情况
+         // 1，没值 则是新放的task 就启动这个task
+         // 2，有值 是FutureTask 说明有线程在我执行putIfAbsent之前已经捷足先登了 那就把自己新建的task抛弃掉
+         // 3，有值 不是FutureTask 说明已经有task已经执行完成并放入了result 那就直接返回这个resutl即可
+         if (prevTask == null) {
+             // creator does the load
+             creator = true;
+             task.run();
+         } else if (prevTask instanceof FutureTask) {
+             task = (FutureTask<V>) prevTask;
+         } else {
+             return (V) prevTask;
+         }
+     }
 
+     V result;
+     try {
+          // task执行完毕返回值
+         result = task.get();
+     } catch (InterruptedException e) {
+         throw new IllegalStateException("Interrupted while loading cache item", e);
+     } catch (ExecutionException e) {
+         Throwable cause = e.getCause();
+         if (cause instanceof RuntimeException) {
+             throw ((RuntimeException) cause);
+         }
+         throw new IllegalStateException("Unable to load cache item", cause);
+     }
+     if (creator) {
+         // 放缓存
+         map.put(cacheKey, result);
+     }
+     return result;
+ }
+}
+```
+以上代码详细解读后发现是这样设计的：
+1，用ConcurrentMap存储，先放的value是FutureTask，执行完成后value放执行结果，并保证在FutureTask放入之后，再不能进行替换操作，无论是否执行完毕。
+2，利用FutureTask异步获取执行结果的能力把编织字节码的过程异步化，新的线程获取同一个代理类时，因为保证在放入map后的task只执行一次，也就没有并发情况是多个相同代理类的编织消耗了。
+下面画了示意图：
+![](https://raw.githubusercontent.com/dchack/java_read_learn/master/view/cglib1-1.jpg)
 
+这个设计的场景应该是比较常见的，产生一个对象比较消耗，这时候自然会想到把它缓存起来，一般的写法就向下面的代码：  
+先组装这个对象，然后放入缓存，放入的时候判断是否已存在。但是这种写法在高并发时一波线程全部同时到达第一步代码，然后都去执行消耗的代码，然后进入第二步的时候就要不断替换，虽然最后的结果可能是正确的，不过会有无谓的浪费。现在再看一下cglib的实现就可以学到了。
+```JAVA
+Object object = create();//1
+map.putIfAbsent(key, obj);//2
+```
 
+新建task的代码就是组装代理类的代码，但是这个return loader.apply(key);里的load是调用方传入的，我们看下调用方的代码：
 先打开ClassLoaderData的代码，它是AbstractClassGenerator的内部类：
 
 ```JAVA
 protected static class ClassLoaderData {
        private final Set<String> reservedClassNames = new HashSet<String>();
-
-       /**
-        * {@link AbstractClassGenerator} here holds "cache key" (e.g. {@link net.sf.cglib.proxy.Enhancer}
-        * configuration), and the value is the generated class plus some additional values
-        * (see {@link #unwrapCachedValue(Object)}.
-        * <p>The generated classes can be reused as long as their classloader is reachable.</p>
-        * <p>Note: the only way to access a class is to find it through generatedClasses cache, thus
-        * the key should not expire as long as the class itself is alive (its classloader is alive).</p>
-        */
        private final LoadingCache<AbstractClassGenerator, Object, Object> generatedClasses;
-
-       /**
-        * Note: ClassLoaderData object is stored as a value of {@code WeakHashMap<ClassLoader, ...>} thus
-        * this classLoader reference should be weak otherwise it would make classLoader strongly reachable
-        * and alive forever.
-        * Reference queue is not required since the cleanup is handled by {@link WeakHashMap}.
-        */
        private final WeakReference<ClassLoader> classLoader;
 
        private final Predicate uniqueNamePredicate = new Predicate() {
@@ -275,6 +338,7 @@ protected static class ClassLoaderData {
                throw new IllegalArgumentException("classLoader == null is not yet supported");
            }
            this.classLoader = new WeakReference<ClassLoader>(classLoader);
+           // 组装load
            Function<AbstractClassGenerator, Object> load =
                    new Function<AbstractClassGenerator, Object>() {
                        public Object apply(AbstractClassGenerator gen) {
@@ -282,6 +346,7 @@ protected static class ClassLoaderData {
                            return gen.wrapCachedClass(klass);
                        }
                    };
+          // 组装LoadingCache代码
            generatedClasses = new LoadingCache<AbstractClassGenerator, Object, Object>(GET_KEY, load);
        }
 
@@ -308,5 +373,427 @@ protected static class ClassLoaderData {
    }
 
 ```
+直接取出loader.apply(key);的代码：
+```java
+public Object apply(AbstractClassGenerator gen) {
+    Class klass = gen.generate(ClassLoaderData.this);
+    return gen.wrapCachedClass(klass);
+}
+```
+首先调用的是
+```java
+protected Class generate(ClassLoaderData data) {
+    Class gen;
+    Object save = CURRENT.get();
+    CURRENT.set(this);
+    try {
+        ClassLoader classLoader = data.getClassLoader();
+        if (classLoader == null) {
+            throw new IllegalStateException("ClassLoader is null while trying to define class " +
+                    getClassName() + ". It seems that the loader has been expired from a weak reference somehow. " +
+                    "Please file an issue at cglib's issue tracker.");
+        }
+        synchronized (classLoader) {
+          String name = generateClassName(data.getUniqueNamePredicate());              
+          data.reserveName(name);
+          this.setClassName(name);
+        }
+        if (attemptLoad) {
+            try {
+                gen = classLoader.loadClass(getClassName());
+                return gen;
+            } catch (ClassNotFoundException e) {
+                // ignore
+            }
+        }
+        // 调用strategy的generate
+        byte[] b = strategy.generate(this);
+        String className = ClassNameReader.getClassName(new ClassReader(b));
+        ProtectionDomain protectionDomain = getProtectionDomain();
+        synchronized (classLoader) { // just in case
+            if (protectionDomain == null) {
+                gen = ReflectUtils.defineClass(className, b, classLoader);
+            } else {
+                gen = ReflectUtils.defineClass(className, b, classLoader, protectionDomain);
+            }
+        }
+        return gen;
+    } catch (RuntimeException e) {
+        throw e;
+    } catch (Error e) {
+        throw e;
+    } catch (Exception e) {
+        throw new CodeGenerationException(e);
+    } finally {
+        CURRENT.set(save);
+    }
+}
 
-ClassLoaderData 构造方法中
+```
+调用strategy的generate：
+```java
+public byte[] generate(ClassGenerator cg) throws Exception {
+      // DebuggingClassWriter中DEBUG_LOCATION_PROPERTY可以设置代理类class文件的路径
+       DebuggingClassWriter cw = getClassVisitor();
+       transform(cg).generateClass(cw);
+       return transform(cw.toByteArray());
+   }
+```
+最后还是调用到net.sf.cglib.proxy.Enhancer#generateClass 而这个方法是ClassGenerator接口定义要实现的方法。
+因为在Enhancer中已经保存了编织代理类的全部信息，编织过程的入口由自己来实现。这里就不再继续深入研究字节码编织的过程，因为这需要理解asm的api和class文件格式已经jvm编译规范。后续的学习过程中将补全这部分内容。  
+那么至此基本写完类以cglib产生代理类的主流程。
+
+#### 反编译例子
+以下是一个例子附加了代理类的反编译代码：
+被代理类：
+```java
+public class SampleClass {
+    public String test(String input) {
+        return "Hello world!";
+    }
+
+    public void big(String i){
+        System.out.println("1111");
+    }
+
+
+    public int test1(String input) {
+        return 1;
+    }
+}
+```
+操作类：
+```java
+public void testMethodInterceptor() throws Exception {
+   Enhancer enhancer = new Enhancer();
+   enhancer.setSuperclass(SampleClass.class);
+   enhancer.setCallback(new MethodInterceptor() {
+       @Override
+       public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy)
+               throws Throwable {
+           if(method.getDeclaringClass() != Object.class && method.getReturnType() == String.class) {
+               return "Hello cglib!";
+           } else {
+               return proxy.invokeSuper(obj, args);
+           }
+       }
+   });
+   SampleClass proxy = (SampleClass) enhancer.create();
+}
+```
+我们可以通过下面代码的设置将cglib产生的代理类生成到自定义的路径上去，方便自己反编译：
+```java
+System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "/gitwork/");
+```
+反编译后代码，我们可以直接看到它继承了SampleClass类，然后在test方法实现的地方做了处理：
+```java
+package com.hope.learn.third.cglib;
+
+import com.hope.learn.third.cglib.SampleClass;
+import java.lang.reflect.Method;
+import net.sf.cglib.core.ReflectUtils;
+import net.sf.cglib.core.Signature;
+import net.sf.cglib.proxy.Callback;
+import net.sf.cglib.proxy.Factory;
+import net.sf.cglib.proxy.MethodInterceptor;
+import net.sf.cglib.proxy.MethodProxy;
+
+public class SampleClass$$EnhancerByCGLIB$$a2b2935d extends SampleClass implements Factory {
+
+   private boolean CGLIB$BOUND;
+   public static Object CGLIB$FACTORY_DATA;
+   private static final ThreadLocal CGLIB$THREAD_CALLBACKS;
+   private static final Callback[] CGLIB$STATIC_CALLBACKS;
+   private MethodInterceptor CGLIB$CALLBACK_0;
+   private static Object CGLIB$CALLBACK_FILTER;
+   private static final Method CGLIB$test$0$Method;
+   private static final MethodProxy CGLIB$test$0$Proxy;
+   private static final Object[] CGLIB$emptyArgs;
+   private static final Method CGLIB$big$1$Method;
+   private static final MethodProxy CGLIB$big$1$Proxy;
+   private static final Method CGLIB$test1$2$Method;
+   private static final MethodProxy CGLIB$test1$2$Proxy;
+   private static final Method CGLIB$equals$3$Method;
+   private static final MethodProxy CGLIB$equals$3$Proxy;
+   private static final Method CGLIB$toString$4$Method;
+   private static final MethodProxy CGLIB$toString$4$Proxy;
+   private static final Method CGLIB$hashCode$5$Method;
+   private static final MethodProxy CGLIB$hashCode$5$Proxy;
+   private static final Method CGLIB$clone$6$Method;
+   private static final MethodProxy CGLIB$clone$6$Proxy;
+
+
+   static void CGLIB$STATICHOOK1() {
+      CGLIB$THREAD_CALLBACKS = new ThreadLocal();
+      CGLIB$emptyArgs = new Object[0];
+      Class var0 = Class.forName("com.hope.learn.third.cglib.SampleClass$$EnhancerByCGLIB$$a2b2935d");
+      Class var1;
+      Method[] var10000 = ReflectUtils.findMethods(new String[]{"test", "(Ljava/lang/String;)Ljava/lang/String;", "big", "(Ljava/lang/String;)V", "test1", "(Ljava/lang/String;)I"}, (var1 = Class.forName("com.hope.learn.third.cglib.SampleClass")).getDeclaredMethods());
+      CGLIB$test$0$Method = var10000[0];
+      CGLIB$test$0$Proxy = MethodProxy.create(var1, var0, "(Ljava/lang/String;)Ljava/lang/String;", "test", "CGLIB$test$0");
+      CGLIB$big$1$Method = var10000[1];
+      CGLIB$big$1$Proxy = MethodProxy.create(var1, var0, "(Ljava/lang/String;)V", "big", "CGLIB$big$1");
+      CGLIB$test1$2$Method = var10000[2];
+      CGLIB$test1$2$Proxy = MethodProxy.create(var1, var0, "(Ljava/lang/String;)I", "test1", "CGLIB$test1$2");
+      var10000 = ReflectUtils.findMethods(new String[]{"equals", "(Ljava/lang/Object;)Z", "toString", "()Ljava/lang/String;", "hashCode", "()I", "clone", "()Ljava/lang/Object;"}, (var1 = Class.forName("java.lang.Object")).getDeclaredMethods());
+      CGLIB$equals$3$Method = var10000[0];
+      CGLIB$equals$3$Proxy = MethodProxy.create(var1, var0, "(Ljava/lang/Object;)Z", "equals", "CGLIB$equals$3");
+      CGLIB$toString$4$Method = var10000[1];
+      CGLIB$toString$4$Proxy = MethodProxy.create(var1, var0, "()Ljava/lang/String;", "toString", "CGLIB$toString$4");
+      CGLIB$hashCode$5$Method = var10000[2];
+      CGLIB$hashCode$5$Proxy = MethodProxy.create(var1, var0, "()I", "hashCode", "CGLIB$hashCode$5");
+      CGLIB$clone$6$Method = var10000[3];
+      CGLIB$clone$6$Proxy = MethodProxy.create(var1, var0, "()Ljava/lang/Object;", "clone", "CGLIB$clone$6");
+   }
+
+   final String CGLIB$test$0(String var1) {
+      return super.test(var1);
+   }
+
+   public final String test(String var1) {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      return var10000 != null?(String)var10000.intercept(this, CGLIB$test$0$Method, new Object[]{var1}, CGLIB$test$0$Proxy):super.test(var1);
+   }
+
+   final void CGLIB$big$1(String var1) {
+      super.big(var1);
+   }
+
+   public final void big(String var1) {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      if(var10000 != null) {
+         var10000.intercept(this, CGLIB$big$1$Method, new Object[]{var1}, CGLIB$big$1$Proxy);
+      } else {
+         super.big(var1);
+      }
+   }
+
+   final int CGLIB$test1$2(String var1) {
+      return super.test1(var1);
+   }
+
+   public final int test1(String var1) {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      if(var10000 != null) {
+         Object var2 = var10000.intercept(this, CGLIB$test1$2$Method, new Object[]{var1}, CGLIB$test1$2$Proxy);
+         return var2 == null?0:((Number)var2).intValue();
+      } else {
+         return super.test1(var1);
+      }
+   }
+
+   final boolean CGLIB$equals$3(Object var1) {
+      return super.equals(var1);
+   }
+
+   public final boolean equals(Object var1) {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      if(var10000 != null) {
+         Object var2 = var10000.intercept(this, CGLIB$equals$3$Method, new Object[]{var1}, CGLIB$equals$3$Proxy);
+         return var2 == null?false:((Boolean)var2).booleanValue();
+      } else {
+         return super.equals(var1);
+      }
+   }
+
+   final String CGLIB$toString$4() {
+      return super.toString();
+   }
+
+   public final String toString() {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      return var10000 != null?(String)var10000.intercept(this, CGLIB$toString$4$Method, CGLIB$emptyArgs, CGLIB$toString$4$Proxy):super.toString();
+   }
+
+   final int CGLIB$hashCode$5() {
+      return super.hashCode();
+   }
+
+   public final int hashCode() {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      if(var10000 != null) {
+         Object var1 = var10000.intercept(this, CGLIB$hashCode$5$Method, CGLIB$emptyArgs, CGLIB$hashCode$5$Proxy);
+         return var1 == null?0:((Number)var1).intValue();
+      } else {
+         return super.hashCode();
+      }
+   }
+
+   final Object CGLIB$clone$6() throws CloneNotSupportedException {
+      return super.clone();
+   }
+
+   protected final Object clone() throws CloneNotSupportedException {
+      MethodInterceptor var10000 = this.CGLIB$CALLBACK_0;
+      if(this.CGLIB$CALLBACK_0 == null) {
+         CGLIB$BIND_CALLBACKS(this);
+         var10000 = this.CGLIB$CALLBACK_0;
+      }
+
+      return var10000 != null?var10000.intercept(this, CGLIB$clone$6$Method, CGLIB$emptyArgs, CGLIB$clone$6$Proxy):super.clone();
+   }
+
+   public static MethodProxy CGLIB$findMethodProxy(Signature var0) {
+      String var10000 = var0.toString();
+      switch(var10000.hashCode()) {
+      case -1315810049:
+         if(var10000.equals("big(Ljava/lang/String;)V")) {
+            return CGLIB$big$1$Proxy;
+         }
+         break;
+      case -508378822:
+         if(var10000.equals("clone()Ljava/lang/Object;")) {
+            return CGLIB$clone$6$Proxy;
+         }
+         break;
+      case -178329709:
+         if(var10000.equals("test(Ljava/lang/String;)Ljava/lang/String;")) {
+            return CGLIB$test$0$Proxy;
+         }
+         break;
+      case 992023923:
+         if(var10000.equals("test1(Ljava/lang/String;)I")) {
+            return CGLIB$test1$2$Proxy;
+         }
+         break;
+      case 1826985398:
+         if(var10000.equals("equals(Ljava/lang/Object;)Z")) {
+            return CGLIB$equals$3$Proxy;
+         }
+         break;
+      case 1913648695:
+         if(var10000.equals("toString()Ljava/lang/String;")) {
+            return CGLIB$toString$4$Proxy;
+         }
+         break;
+      case 1984935277:
+         if(var10000.equals("hashCode()I")) {
+            return CGLIB$hashCode$5$Proxy;
+         }
+      }
+
+      return null;
+   }
+
+   public SampleClass$$EnhancerByCGLIB$$a2b2935d() {
+      CGLIB$BIND_CALLBACKS(this);
+   }
+
+   public static void CGLIB$SET_THREAD_CALLBACKS(Callback[] var0) {
+      CGLIB$THREAD_CALLBACKS.set(var0);
+   }
+
+   public static void CGLIB$SET_STATIC_CALLBACKS(Callback[] var0) {
+      CGLIB$STATIC_CALLBACKS = var0;
+   }
+
+   private static final void CGLIB$BIND_CALLBACKS(Object var0) {
+      SampleClass$$EnhancerByCGLIB$$a2b2935d var1 = (SampleClass$$EnhancerByCGLIB$$a2b2935d)var0;
+      if(!var1.CGLIB$BOUND) {
+         var1.CGLIB$BOUND = true;
+         Object var10000 = CGLIB$THREAD_CALLBACKS.get();
+         if(var10000 == null) {
+            var10000 = CGLIB$STATIC_CALLBACKS;
+            if(CGLIB$STATIC_CALLBACKS == null) {
+               return;
+            }
+         }
+
+         var1.CGLIB$CALLBACK_0 = (MethodInterceptor)((Callback[])var10000)[0];
+      }
+
+   }
+
+   public Object newInstance(Callback[] var1) {
+      CGLIB$SET_THREAD_CALLBACKS(var1);
+      SampleClass$$EnhancerByCGLIB$$a2b2935d var10000 = new SampleClass$$EnhancerByCGLIB$$a2b2935d();
+      CGLIB$SET_THREAD_CALLBACKS((Callback[])null);
+      return var10000;
+   }
+
+   public Object newInstance(Callback var1) {
+      CGLIB$SET_THREAD_CALLBACKS(new Callback[]{var1});
+      SampleClass$$EnhancerByCGLIB$$a2b2935d var10000 = new SampleClass$$EnhancerByCGLIB$$a2b2935d();
+      CGLIB$SET_THREAD_CALLBACKS((Callback[])null);
+      return var10000;
+   }
+
+   public Object newInstance(Class[] var1, Object[] var2, Callback[] var3) {
+      CGLIB$SET_THREAD_CALLBACKS(var3);
+      SampleClass$$EnhancerByCGLIB$$a2b2935d var10000 = new SampleClass$$EnhancerByCGLIB$$a2b2935d;
+      switch(var1.length) {
+      case 0:
+         var10000.<init>();
+         CGLIB$SET_THREAD_CALLBACKS((Callback[])null);
+         return var10000;
+      default:
+         throw new IllegalArgumentException("Constructor not found");
+      }
+   }
+
+   public Callback getCallback(int var1) {
+      CGLIB$BIND_CALLBACKS(this);
+      MethodInterceptor var10000;
+      switch(var1) {
+      case 0:
+         var10000 = this.CGLIB$CALLBACK_0;
+         break;
+      default:
+         var10000 = null;
+      }
+
+      return var10000;
+   }
+
+   public void setCallback(int var1, Callback var2) {
+      switch(var1) {
+      case 0:
+         this.CGLIB$CALLBACK_0 = (MethodInterceptor)var2;
+      default:
+      }
+   }
+
+   public Callback[] getCallbacks() {
+      CGLIB$BIND_CALLBACKS(this);
+      return new Callback[]{this.CGLIB$CALLBACK_0};
+   }
+
+   public void setCallbacks(Callback[] var1) {
+      this.CGLIB$CALLBACK_0 = (MethodInterceptor)var1[0];
+   }
+
+   static {
+      CGLIB$STATICHOOK1();
+   }
+}
+```
