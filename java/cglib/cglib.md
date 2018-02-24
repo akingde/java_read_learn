@@ -6,7 +6,9 @@ CGLIB 核心类，这个抽象类作为CGLIB中代码生成调度员角色，做
 Enhancer 继承 AbstractClassGenerator
 从Enhancer中的crate方法系列开始这场旅行。  
 以下三个方法用classOnly参数来控制返回的是Class对象，还是代理对象本身。所以我们可以知道在调用createHelper方法的时候这两个对象是要生成的。
-```JAVA
+
+```java
+
 /**
   *
   * 入口方法，产生一个代理对象
@@ -32,9 +34,10 @@ Enhancer 继承 AbstractClassGenerator
      classOnly = true;
      return (Class)createHelper();
  }
- ```
-静态的crate方法：
-```JAVA
+```
+静态的crate方法：  
+
+```java
   public static Object create(Class type, Callback callback) {
       Enhancer e = new Enhancer();
       e.setSuperclass(type);
@@ -303,13 +306,63 @@ protected V createEntry(final K key, KK cacheKey, Object v) {
 1，用ConcurrentMap存储，先放的value是FutureTask，执行完成后value放执行结果，并保证在FutureTask放入之后，再不能进行替换操作，无论是否执行完毕。
 2，利用FutureTask异步获取执行结果的能力把编织字节码的过程异步化，新的线程获取同一个代理类时，因为保证在放入map后的task只执行一次，也就没有并发情况是多个相同代理类的编织消耗了。
 下面画了示意图：
-![](https://raw.githubusercontent.com/dchack/java_read_learn/master/view/cglib1-1.jpg)
+<img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/cglib1-1.jpg" width="50%" height="50%">  
 
 这个设计的场景应该是比较常见的，产生一个对象比较消耗，这时候自然会想到把它缓存起来，一般的写法就向下面的代码：  
 先组装这个对象，然后放入缓存，放入的时候判断是否已存在。但是这种写法在高并发时一波线程全部同时到达第一步代码，然后都去执行消耗的代码，然后进入第二步的时候就要不断替换，虽然最后的结果可能是正确的，不过会有无谓的浪费。现在再看一下cglib的实现就可以学到了。
 ```JAVA
 Object object = create();//1
 map.putIfAbsent(key, obj);//2
+```
+
+这里详细再展开下，因为这也是非常值得学习的地方，我们想如果我们并不想用异步的方式呢？以下是一个网上解决方案，很有意思：
+```JAVA
+public class concurrentMapTest {
+
+    // 记录自旋状态的轻量级类，只封装了一个volatile状态
+    public static class SpinStatus{
+        volatile boolean released;
+    }
+
+    // 辅助并发控制的Map，用来找出每个key对应的第一个成功进入的线程
+    private ConcurrentMap<String, SpinStatus> raceUtil = new ConcurrentHashMap<String, SpinStatus>();
+
+    private ConcurrentMap<String, Object> map = new ConcurrentHashMap<String, Object>();
+
+    public Object test(String key){
+        Object value = map.get(key);
+        // 第一次
+        if(value == null){
+            // 需要为并发的线程new一个自旋状态，只有第一个成功执行putIfAbsent方法的线程设置的SpinStatus会被共享
+            SpinStatus spinStatus = new SpinStatus();
+            SpinStatus oldSpinStatus = raceUtil.putIfAbsent(key, spinStatus);
+            //只有第一个执行成功的线程拿到的oldSpinStatus是null，其他线程拿到的oldSpinStatus是第一个线程设置的，可以在所有线程中共享
+            if(oldSpinStatus == null){
+                value = create();
+                // 放入共享的并发Map，后续线程执行get()方法后可以直接拿到非null的引用返回
+                map.put(key, value);
+                // 释放其他自旋的线程,注意，对第一个成功执行的线程使用的是spinStatus的引用
+                spinStatus.released = true;
+            }else{
+                // 其他线程在oldSpinStatus引用所指向的共享自旋状态上自旋，等待被释放
+                while(!oldSpinStatus.released){};
+            }
+
+            // 再次获取一下，这时候是肯定不为空
+            value = map.get(key);
+        }
+        return value;
+    }
+
+    /**
+     * 假装耗时代码
+     * @return
+     */
+    public static String create(){
+        return "1";
+    }
+}
+
 ```
 
 新建task的代码就是组装代理类的代码，但是这个return loader.apply(key);里的load是调用方传入的，我们看下调用方的代码：
