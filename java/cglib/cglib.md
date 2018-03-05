@@ -1,6 +1,11 @@
+##### 概念
+在java的世界里，基于jvm实现的语言最终要进入jvm编译的流程都需要把上层高级语言所表达的内容自行编译成字节码文件，而cglib是一个操作字节码生成自定义类的库，它底层调用的是ASM库来操作字节码的。示意图：  
+<img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/java-class.jpg" width="65%" height="65%">  
+
+这里主要以使用cglib入口为起点进入它源代码，详细查看内部的实现机制。
+
 ##### AbstractClassGenerator
-CGLIB 核心类，这个抽象类作为CGLIB中代码生成调度员角色，做了缓存，定制ClassLoader，命名。
-它定义了代理类生成的过程
+CGLIB 核心类，这个抽象类作为CGLIB中代码生成调度员角色，包含缓存操作，定制ClassLoader，命名策略（NamingPolicy），代码生成策略（GeneratorStrategy）。
 
 ##### Enhancer
 Enhancer 继承 AbstractClassGenerator
@@ -8,7 +13,6 @@ Enhancer 继承 AbstractClassGenerator
 以下三个方法用classOnly参数来控制返回的是Class对象，还是代理对象本身。所以我们可以知道在调用createHelper方法的时候这两个对象是要生成的。
 
 ```java
-
 /**
   *
   * 入口方法，产生一个代理对象
@@ -89,7 +93,7 @@ private Object createHelper() {
   }
 ```
 
-AbstractClassGenerator.create(Object)方法:
+AbstractClassGenerator.create(Object)方法，这是一个核心模版方法:
 ```JAVA
 protected Object create(Object key) {
     try {
@@ -305,7 +309,7 @@ protected V createEntry(final K key, KK cacheKey, Object v) {
 以上代码详细解读后发现是这样设计的：
 1，用ConcurrentMap存储，先放的value是FutureTask，执行完成后value放执行结果，并保证在FutureTask放入之后，再不能进行替换操作，无论是否执行完毕。
 2，利用FutureTask异步获取执行结果的能力把编织字节码的过程异步化，新的线程获取同一个代理类时，因为保证在放入map后的task只执行一次，也就没有并发情况是多个相同代理类的编织消耗了。
-下面画了示意图：
+下面画了示意图：  
 <img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/cglib1-1.jpg" width="50%" height="50%">  
 
 这个设计的场景应该是比较常见的，产生一个对象比较消耗，这时候自然会想到把它缓存起来，一般的写法就向下面的代码：  
@@ -483,7 +487,7 @@ protected Class generate(ClassLoaderData data) {
 }
 
 ```
-调用strategy的generate：
+调用strategy的generate，这里就是代码生成策略预留的口子，我们可以通过AbstractClassGenerator.setStrategy(GeneratorStrategy strategy)来设置自定义的strategy，默认是DefaultGeneratorStrategy：
 ```java
 public byte[] generate(ClassGenerator cg) throws Exception {
       // DebuggingClassWriter中DEBUG_LOCATION_PROPERTY可以设置代理类class文件的路径
