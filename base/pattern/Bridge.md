@@ -20,3 +20,5 @@
 
 因为前面提到在颜色和形状的上面是一个杯子的抽象，所以我想在实际使用中我们更多的可能是，将多个不同类型的实现部分抽象后，以组合的关系进行关联。  
 <img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/桥接模式3.jpg" width="65%" height="65%">  
+
+我们可以看见shape 和 color （实现）可以扩展，cup的种类（抽象）也可以扩展。
