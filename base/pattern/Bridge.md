@@ -10,12 +10,13 @@
 桥梁模式中的所谓脱耦，就是指在一个软件系统的抽象化和实现化之间使用组合/聚合关系而不是继承关系，从而使两者可以相对独立地变化。
 
 例子：
-一个杯子，它有形状，有颜色，我们得到下面图的关系，虽然我们单独把颜色和形状抽象出来了，担当我们新出现一种颜色的时候，我们需要新增出和形状的实现进行组合的全部类。
+一个杯子，它有形状，有颜色，我们得到下面图的关系，虽然我们单独把颜色和形状抽象出来了，担当我们新出现一种颜色的时候，我们需要新增出和形状的实现进行组合的全部类。  
 <img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/桥接模式1.jpg" width="65%" height="65%">  
 
-这个是网上提供的桥接模式的解决方案的类图：
+这个是提供的桥接模式的解决方案的类图：  
 <img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/桥接模式2.jpg" width="65%" height="65%">  
 
 解释地址：https://www.journaldev.com/1491/bridge-design-pattern-java
 
-因为前面提到在颜色和形状的上面是一个杯子的抽象，所以我想在实际使用中我们更多的可能是，将多个不同类型的实现部分抽象后，以组合的关系进行关联。
+因为前面提到在颜色和形状的上面是一个杯子的抽象，所以我想在实际使用中我们更多的可能是，将多个不同类型的实现部分抽象后，以组合的关系进行关联。  
+<img src="https://raw.githubusercontent.com/dchack/java_read_learn/master/view/桥接模式3.jpg" width="65%" height="65%">  
