@@ -203,7 +203,7 @@ private final Constructor primaryConstructor;
 ```JAVA
 public static Constructor getConstructor(Class type, Class[] parameterTypes) {
     try {
-        // 这一步就是nextInstance在省略的
+        // 这一步就是nextInstance在省略的内容
         Constructor constructor = type.getDeclaredConstructor(parameterTypes);
         constructor.setAccessible(true);
         return constructor;
