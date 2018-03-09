@@ -1,3 +1,4 @@
+[git链接](https://github.com/dchack/java_read_learn/blob/master/base/pattern/Bridge.md)
 ##### 桥接模式
 桥梁模式的用意是"将抽象化(Abstraction)与实现化(Implementation)脱耦，使得二者可以独立地变化"。这句话有三个关键词，也就是抽象化、实现化和脱耦。
 * 抽象化
