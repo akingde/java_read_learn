@@ -12,4 +12,7 @@
 
 
 ##### 使用建议
-当我们发现需求中提现出有层级关系的结构，希望用户在在使用单个对象或组合对象时，都可以统一使用它们的行为。
+当我们发现需求中提现出有层级关系的结构，希望用户在在使用单个对象或组合对象时，都可以统一使用它们的行为。  
+
+代码：  
+https://github.com/dchack/water_framwork/blob/master/hope-learn/src/java/com/hope/learn/patterns/composition/Client.java
