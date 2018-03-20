@@ -1,5 +1,5 @@
 ### HashSet
-1，内部维护一个HashMap来实现：
+1，内部维护一个HashMap来实现，是一个[适配模式的实现](https://github.com/dchack/java_read_learn/blob/master/base/pattern/Adpater.md)：
 ```JAVA
 private transient HashMap<E,Object> map;
 ```
